@@ -94,8 +94,8 @@
   $('#title').textContent = CFG.title || 'Đăng ký ngắm sao';
   $('#organizer').textContent = CFG.organizer || '';
   $('#intro').textContent = CFG.intro || '';
-  $('#contact').textContent = CFG.contact || '';
-  if (!API.remote) $('#demoBanner').hidden = false;
+  if ($('#contact')) $('#contact').textContent = CFG.contact || '';
+  if (!API.remote && $('#demoBanner')) $('#demoBanner').hidden = false;
   NS.sky();
 
   function say(text, kind) { msg.textContent = text || ''; msg.className = 'msg' + (kind ? ' ' + kind : ''); }
