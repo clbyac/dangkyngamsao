@@ -44,9 +44,25 @@
   }
   function nowKey() { return nowStr().slice(0, 16); }
 
+  const HAN = CFG.hanDangKyPhut != null ? +CFG.hanDangKyPhut : 120;
+  function deadlineKey(s) {
+    if (s.hanDangKy) return s.hanDangKy;
+    const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(startKey(s));
+    if (!m) return '';
+    const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5] - HAN);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function fmtDeadline(s) {
+    const k = deadlineKey(s); if (!k) return '';
+    const hm = k.slice(11), day = k.slice(0, 10);
+    return day === s.ngay ? hm : hm + ' ' + day.slice(8, 10) + '/' + day.slice(5, 7);
+  }
+
   function sessionStatus(s) {
     if (!s.mo) return 'closed';
-    if (s.ngay && startKey(s) <= nowKey()) return 'past';
+    const now = nowKey();
+    if (s.ngay && startKey(s) <= now) return 'past';
+    if (s.ngay && deadlineKey(s) && deadlineKey(s) <= now) return 'expired';
     if ((s.conLai || 0) <= 0) return 'full';
     return 'open';
   }
@@ -97,6 +113,7 @@
     if (!ses) throw new Error('Buổi ngắm không tồn tại.');
     const st = sessionStatus(ses);
     if (st === 'closed' || st === 'past') throw new Error('Suất này đã đóng đăng ký.');
+    if (st === 'expired') throw new Error('Đã hết hạn đăng ký suất này (hạn lúc ' + fmtDeadline(ses) + ').');
     const regs = localRegs();
     const dup = regs.find(r => r.buoiId === x.buoiId && r.sdt === x.sdt && sameName(r.hoTen, x.hoTen));
     if (dup) throw new Error(dup.hoTen + ' đã đăng ký suất này rồi (mã ' + dup.ma + ').');
@@ -178,5 +195,5 @@
   }
 
   window.NS = { CFG, API, sget, sset, esc, pad, todayStr, nowStr, parseDate, weekday, fmtDate, normalizePhone,
-    PHONE_RE, EMAIL_RE, isTrue, sessionStatus, startKey, cleanReg, sky, setRed, isRed };
+    PHONE_RE, EMAIL_RE, isTrue, sessionStatus, startKey, deadlineKey, fmtDeadline, cleanReg, sky, setRed, isRed };
 })();
