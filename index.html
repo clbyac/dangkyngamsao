@@ -85,7 +85,7 @@
 <script>
 (function () {
   'use strict';
-  const { CFG, API, esc, pad, parseDate, weekday, fmtDate, sessionStatus, normalizePhone, PHONE_RE, EMAIL_RE } = NS;
+  const { CFG, API, esc, pad, parseDate, weekday, fmtDate, sessionStatus, fmtDeadline, normalizePhone, PHONE_RE } = NS;
   const $ = s => document.querySelector(s);
   const form = $('#regForm'), box = $('#sessions'), btn = $('#submitBtn'), msg = $('#formMsg');
   let sessions = [];
@@ -125,8 +125,10 @@
       const st = sessionStatus(s), d = parseDate(s.ngay);
       const cap = +s.sucChua || 0, used = +s.daDangKy || 0;
       const pct = cap ? Math.min(100, used / cap * 100) : 0;
+      const han = fmtDeadline(s);
       const label = st === 'open' ? 'Còn ' + s.conLai + '/' + cap + ' chỗ'
-                  : st === 'full' ? 'Hết chỗ' : 'Đã đóng đăng ký';
+                  : st === 'full' ? 'Hết chỗ'
+                  : st === 'expired' ? 'Hết hạn đăng ký' : 'Đã đóng đăng ký';
       const off = st !== 'open';
       return '<label class="ses ' + (off ? 'is-off ' : '') + (st === 'full' ? 'full' : '') + '">' +
         '<input type="radio" name="buoiId" value="' + esc(s.id) + '"' + (off ? ' disabled' : '') +
@@ -136,6 +138,7 @@
         '<div class="ses-body"><strong>' + esc(s.ten) + '</strong>' +
           '<span class="meta">' + esc(weekday(s.ngay)) + (s.gio ? ' · ' + esc(s.gio) : '') + '</span>' +
           (s.diaDiem ? '<span class="meta">' + esc(s.diaDiem) + '</span>' : '') +
+          (han && st !== 'expired' ? '<span class="meta deadline">Hạn đăng ký: trước ' + esc(han) + '</span>' : '') +
           (s.ghiChu ? '<span class="meta note">' + esc(s.ghiChu) + '</span>' : '') +
           '<div class="cap"><div class="bar"><i style="width:' + pct.toFixed(0) + '%"></i></div><span>' + label + '</span></div>' +
         '</div><span class="tick" aria-hidden="true">✓</span></label>';
