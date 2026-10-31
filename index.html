@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đăng ký ngắm sao</title>
+<meta name="description" content="Đăng ký tham gia buổi ngắm sao">
+<meta name="theme-color" content="#060a17">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<main class="wrap">
+  <header class="hero">
+    <p class="eyebrow" id="organizer"></p>
+    <h1 id="title">Đăng ký ngắm sao</h1>
+    <p class="lead" id="intro"></p>
+  </header>
+
+  <form id="regForm" class="card" novalidate>
+    <section>
+      <h2><span class="step">1</span> Chọn suất</h2>
+      <div id="sessions" class="sessions" role="radiogroup" aria-label="Suất">
+        <p class="muted">Đang tải lịch…</p>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="step">2</span> Thông tin của bạn</h2>
+      <div class="grid">
+        <div class="field full"><span>Người đăng ký</span>
+          <div class="seg" role="radiogroup" aria-label="Người đăng ký">
+            <label><input type="radio" name="vaiTro" value="Học sinh" checked><span>Học sinh</span></label>
+            <label><input type="radio" name="vaiTro" value="Phụ huynh"><span>Phụ huynh</span></label>
+          </div>
+        </div>
+        <label class="field full"><span>Họ và tên học sinh <span class="req">*</span></span>
+          <input name="hoTen" autocomplete="off" maxlength="100">
+        </label>
+        <label class="field"><span>Lớp <span class="req">*</span></span>
+          <input name="lop" maxlength="20" placeholder="VD: 8A2">
+        </label>
+        <label class="field"><span>Trường <span class="req">*</span></span>
+          <input name="truong" maxlength="120" placeholder="VD: THCS Nguyễn Du">
+        </label>
+        <label class="field"><span>Họ tên phụ huynh <span class="req ph">*</span></span>
+          <input name="phuHuynh" maxlength="100" data-ph="Không bắt buộc">
+        </label>
+        <label class="field"><span>Số điện thoại <span class="req">*</span></span>
+          <input name="sdt" type="tel" inputmode="tel" autocomplete="tel" placeholder="0912 345 678" maxlength="16">
+        </label>
+      </div>
+      <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary lg" id="submitBtn" type="submit">Đăng ký</button>
+      <span id="formMsg" class="msg" role="status" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <section id="ticket" class="card ticket" hidden aria-live="polite">
+    <div class="ok-ic">✓</div>
+    <h2>Đăng ký thành công!</h2>
+    <p class="muted">Mã đăng ký của bạn — hãy chụp màn hình lại để check-in.</p>
+    <div class="code" id="tCode"></div>
+    <div class="tdetail" id="tDetail"></div>
+    <ul class="tips">
+      <li>Có mặt sớm 10–15 phút để kịp nghe hướng dẫn.</li>
+      <li>Suất tối: mang áo ấm, Tây Nguyên về đêm khá lạnh.</li>
+      <li>Hạn chế dùng đèn pin trắng và màn hình sáng — mắt cần 15–20 phút để thích nghi bóng tối.</li>
+      <li>Nếu trời mây, phần ngắm sao có thể thay đổi; ban tổ chức sẽ báo qua số điện thoại đã đăng ký.</li>
+    </ul>
+    <div class="actions" style="justify-content:center">
+      <button class="btn" id="againBtn" type="button">Đăng ký thêm người khác</button>
+    </div>
+  </section>
+</main>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { CFG, API, esc, pad, parseDate, weekday, fmtDate, sessionStatus, normalizePhone, PHONE_RE, EMAIL_RE } = NS;
+  const $ = s => document.querySelector(s);
+  const form = $('#regForm'), box = $('#sessions'), btn = $('#submitBtn'), msg = $('#formMsg');
+  let sessions = [];
+
+  document.title = CFG.title || document.title;
+  $('#title').textContent = CFG.title || 'Đăng ký ngắm sao';
+  $('#organizer').textContent = CFG.organizer || '';
+  $('#intro').textContent = CFG.intro || '';
+  $('#contact').textContent = CFG.contact || '';
+  if (!API.remote) $('#demoBanner').hidden = false;
+  NS.sky();
+
+  function say(text, kind) { msg.textContent = text || ''; msg.className = 'msg' + (kind ? ' ' + kind : ''); }
+
+  async function loadSessions() {
+    const keep = form.querySelector('input[name=buoiId]:checked');
+    const keepId = keep ? keep.value : '';
+    try {
+      sessions = await API.sessions();
+      renderSessions(keepId);
+    } catch (e) {
+      box.innerHTML = '<p class="err">Không tải được lịch: ' + esc(e.message) +
+        ' <button type="button" class="linkbtn" id="retry">Thử lại</button></p>';
+      $('#retry').onclick = loadSessions;
+    }
+  }
+
+  function renderSessions(keepId) {
+    const list = sessions.filter(s => sessionStatus(s) !== 'past')
+      .sort((a, b) => String(a.ngay).localeCompare(String(b.ngay)));
+    if (!list.length) {
+      box.innerHTML = '<p class="muted">Hiện chưa có suất nào mở đăng ký. Hẹn bạn lần sau!</p>';
+      btn.disabled = true; return;
+    }
+    btn.disabled = false;
+    box.innerHTML = list.map(s => {
+      const st = sessionStatus(s), d = parseDate(s.ngay);
+      const cap = +s.sucChua || 0, used = +s.daDangKy || 0;
+      const pct = cap ? Math.min(100, used / cap * 100) : 0;
+      const label = st === 'open' ? 'Còn ' + s.conLai + '/' + cap + ' chỗ'
+                  : st === 'full' ? 'Hết chỗ' : 'Đã đóng đăng ký';
+      const off = st !== 'open';
+      return '<label class="ses ' + (off ? 'is-off ' : '') + (st === 'full' ? 'full' : '') + '">' +
+        '<input type="radio" name="buoiId" value="' + esc(s.id) + '"' + (off ? ' disabled' : '') +
+          (!off && s.id === keepId ? ' checked' : '') + '>' +
+        '<div class="ses-date"><span class="d">' + (d ? pad(d.getDate()) : '?') + '</span><span class="m">' +
+          (d ? 'Th ' + (d.getMonth() + 1) : '') + '</span></div>' +
+        '<div class="ses-body"><strong>' + esc(s.ten) + '</strong>' +
+          '<span class="meta">' + esc(weekday(s.ngay)) + (s.gio ? ' · ' + esc(s.gio) : '') + '</span>' +
+          (s.diaDiem ? '<span class="meta">' + esc(s.diaDiem) + '</span>' : '') +
+          (s.ghiChu ? '<span class="meta note">' + esc(s.ghiChu) + '</span>' : '') +
+          '<div class="cap"><div class="bar"><i style="width:' + pct.toFixed(0) + '%"></i></div><span>' + label + '</span></div>' +
+        '</div><span class="tick" aria-hidden="true">✓</span></label>';
+    }).join('');
+  }
+
+  box.addEventListener('change', () => { box.classList.remove('invalid'); say(''); });
+  form.addEventListener('input', e => { e.target.classList && e.target.classList.remove('invalid'); });
+  // Phụ huynh đăng ký → ô "Họ tên phụ huynh" không bắt buộc
+  function syncRole() {
+    const ph = form.querySelector('input[name=vaiTro]:checked').value === 'Phụ huynh';
+    const el = form.elements.phuHuynh;
+    if (el.dataset.hs == null) el.dataset.hs = el.placeholder;
+    form.classList.toggle('is-ph', ph);
+    el.placeholder = ph ? el.dataset.ph : el.dataset.hs;
+    if (ph) el.classList.remove('invalid');
+  }
+  form.querySelectorAll('input[name=vaiTro]').forEach(r => r.addEventListener('change', syncRole));
+  syncRole();
+
+  function validate(d) {
+    const t = v => String(v || '').trim();
+    if (!d.buoiId) return [box, 'Vui lòng chọn suất.'];
+    if (t(d.hoTen).length < 2) return [form.elements.hoTen, 'Vui lòng nhập họ và tên học sinh.'];
+    if (!t(d.lop)) return [form.elements.lop, 'Vui lòng nhập lớp.'];
+    if (t(d.truong).length < 2) return [form.elements.truong, 'Vui lòng nhập trường.'];
+    if (d.vaiTro !== 'Phụ huynh' && t(d.phuHuynh).length < 2) return [form.elements.phuHuynh, 'Vui lòng nhập họ tên phụ huynh.'];
+    if (!PHONE_RE.test(normalizePhone(d.sdt))) return [form.elements.sdt, 'Số điện thoại chưa đúng (10 số, bắt đầu bằng 0).'];
+    const s = sessions.find(x => x.id === d.buoiId);
+    if (s && s.conLai < 1) return [box, 'Suất này vừa hết chỗ — vui lòng chọn suất khác.'];
+    return null;
+  }
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    if (d.website) return; // bẫy bot
+    const bad = validate(d);
+    if (bad) {
+      bad[0].classList.add('invalid');
+      if (bad[0].focus && bad[0].tagName !== 'DIV' && bad[0].tagName !== 'LABEL') bad[0].focus();
+      else bad[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      say(bad[1], 'err'); return;
+    }
+    btn.disabled = true; btn.textContent = 'Đang gửi…'; say('');
+    try {
+      delete d.website;
+      const res = await API.register(d);
+      showTicket(res, d);
+    } catch (err) {
+      say(err.message, 'err');
+      loadSessions(); // cập nhật số chỗ còn lại
+    } finally {
+      btn.disabled = false; btn.textContent = 'Đăng ký';
+    }
+  });
+
+  function showTicket(res, d) {
+    const s = res.session || sessions.find(x => x.id === d.buoiId) || {};
+    const t = v => String(v || '').trim();
+    $('#tCode').textContent = res.ma;
+    const rows = [
+      ['Học sinh', t(d.hoTen)],
+      ['Lớp – Trường', [t(d.lop), t(d.truong)].filter(Boolean).join(' – ')],
+      ['Phụ huynh', t(d.phuHuynh)],
+      ['Nội dung', s.ten],
+      ['Thời gian', [s.gio, fmtDate(s.ngay, true)].filter(Boolean).join(' · ')],
+      ['Địa điểm', s.diaDiem]
+    ].filter(r => r[1]);
+    $('#tDetail').innerHTML = rows.map(r => '<div><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('');
+    form.hidden = true; $('#ticket').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  $('#againBtn').onclick = () => {
+    form.reset(); syncRole(); say('');
+    $('#ticket').hidden = true; form.hidden = false;
+    loadSessions();
+  };
+
+  loadSessions();
+})();
+</script>
+</body>
+</html>
