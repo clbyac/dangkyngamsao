@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quản lý đăng ký</title>
+<meta name="theme-color" content="#060a17">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<main class="wrap wide">
+  <header class="hero topbar">
+    <div>
+      <p class="eyebrow" id="organizer"></p>
+      <h1>Quản lý đăng ký</h1>
+    </div>
+    <div class="right">
+      <button class="btn sm" id="redBtn" type="button" title="Đổi giao diện sang đèn đỏ khi check-in ngoài trời">● Đèn đỏ</button>
+      <button class="btn sm" id="logoutBtn" type="button" hidden>Đăng xuất</button>
+    </div>
+  </header>
+
+  <div id="demoBanner" class="banner" hidden>
+    <b>Chế độ thử:</b> đang xem dữ liệu lưu trên trình duyệt này, không có mật khẩu.
+    <button type="button" class="linkbtn" id="clearDemo">Xoá dữ liệu thử</button>
+  </div>
+
+  <form id="loginForm" class="card login" hidden>
+    <h2>Đăng nhập</h2>
+    <label class="field">Mật khẩu quản trị (ADMIN_KEY)
+      <input type="password" name="key" autocomplete="current-password">
+    </label>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn primary" type="submit" id="loginBtn">Vào trang quản lý</button>
+      <span class="msg" id="loginMsg"></span>
+    </div>
+  </form>
+
+  <div id="app" hidden>
+    <div class="stats">
+      <div class="stat"><b id="stReg">0</b><span>Lượt đăng ký</span></div>
+      <div class="stat"><b id="stPeople">0</b><span>Chưa đến</span></div>
+      <div class="stat"><b id="stIn">0</b><span>Đã đến</span></div>
+      <div class="stat"><b id="stLeft">–</b><span id="stLeftLbl">Chỗ còn trống</span></div>
+    </div>
+
+    <div class="toolbar">
+      <select id="fSes" aria-label="Lọc theo suất"></select>
+      <select id="fState" aria-label="Lọc trạng thái" style="flex:0 1 160px">
+        <option value="">Tất cả</option>
+        <option value="no">Chưa đến</option>
+        <option value="yes">Đã đến</option>
+      </select>
+      <input id="fQ" type="search" placeholder="Tìm tên, lớp, trường, SĐT, mã…" aria-label="Tìm kiếm">
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" id="xlsAll" type="button">⬇ Xuất Excel (tất cả suất)</button>
+      <button class="btn" id="xlsOne" type="button">⬇ Xuất suất đang chọn</button>
+      <span class="spacer"></span>
+      <span class="msg muted" id="appMsg"></span>
+      <button class="btn sm" id="reloadBtn" type="button">↻ Làm mới</button>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Mã</th><th>Học sinh</th><th>Phụ huynh / SĐT</th><th>Suất</th><th>Đăng ký lúc</th><th>Check-in</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <span id="contact"></span>
+    <a href="index.html">← Trang đăng ký</a>
+  </footer>
+</main>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { CFG, API, esc, fmtDate, todayStr, isTrue } = NS;
+  const $ = s => document.querySelector(s);
+  let key = '';
+  try { key = sessionStorage.getItem('ngamsao_key') || ''; } catch (e) {}
+  let data = { sessions: [], rows: [] };
+
+  $('#organizer').textContent = CFG.organizer || '';
+  $('#contact').textContent = CFG.contact || '';
+  NS.sky();
+  const syncRedBtn = () => { $('#redBtn').textContent = NS.isRed() ? '○ Giao diện thường' : '● Đèn đỏ'; };
+  syncRedBtn();
+  $('#redBtn').onclick = () => { NS.setRed(!NS.isRed()); syncRedBtn(); };
+
+  if (!API.remote) {
+    $('#demoBanner').hidden = false;
+    $('#clearDemo').onclick = () => { if (confirm('Xoá toàn bộ dữ liệu thử trên trình duyệt này?')) { API.clearDemo(); load(); } };
+  }
+
+  function showLogin(err) {
+    $('#app').hidden = true; $('#loginForm').hidden = false; $('#logoutBtn').hidden = true;
+    $('#loginMsg').textContent = err || ''; $('#loginMsg').className = 'msg' + (err ? ' err' : '');
+    $('#loginForm').elements.key.focus();
+  }
+  $('#loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    key = $('#loginForm').elements.key.value.trim();
+    if (key) load(true);
+  });
+  $('#logoutBtn').onclick = () => {
+    key = ''; try { sessionStorage.removeItem('ngamsao_key'); } catch (e) {}
+    $('#loginForm').reset(); showLogin();
+  };
+
+  async function load(fromLogin) {
+    const lb = $('#loginBtn'), m = $('#appMsg');
+    if (fromLogin) { lb.disabled = true; lb.textContent = 'Đang kiểm tra…'; }
+    m.textContent = 'Đang tải…';
+    try {
+      const res = await API.list(key);
+      data = { sessions: res.sessions || [], rows: res.rows || [] };
+      if (API.remote) { try { sessionStorage.setItem('ngamsao_key', key); } catch (e) {} $('#logoutBtn').hidden = false; }
+      $('#loginForm').hidden = true; $('#app').hidden = false;
+      fillSessionFilter(); render();
+      m.textContent = 'Cập nhật lúc ' + new Date().toLocaleTimeString('vi-VN');
+    } catch (err) {
+      m.textContent = '';
+      if (API.remote && (fromLogin || /mật khẩu/i.test(err.message))) showLogin(err.message);
+      else alert(err.message);
+    } finally {
+      if (fromLogin) { lb.disabled = false; lb.textContent = 'Vào trang quản lý'; }
+    }
+  }
+
+  const sesById = id => data.sessions.find(s => s.id === id);
+  const sortedSessions = () => data.sessions.slice().sort((a, b) => NS.startKey(a).localeCompare(NS.startKey(b)));
+  const sesLabel = s => [s.gio, fmtDate(s.ngay)].filter(Boolean).join(' ') + ' — ' + s.ten;
+
+  function fillSessionFilter() {
+    const sel = $('#fSes'), cur = sel.value;
+    // mặc định chọn buổi sắp tới gần nhất
+    const upcoming = sortedSessions().find(s => !s.ngay || s.ngay >= todayStr());  // suất hôm nay trở đi
+    sel.innerHTML = '<option value="">Tất cả suất (' + data.rows.length + ' lượt)</option>' +
+      sortedSessions().map(s => {
+        const n = data.rows.filter(r => r.buoiId === s.id).length;
+        return '<option value="' + esc(s.id) + '">' + esc(sesLabel(s)) + ' (' + n + '/' + (+s.sucChua || 0) + ')</option>';
+      }).join('');
+    if (cur && sesById(cur)) sel.value = cur;
+    else if (!sel.dataset.init && upcoming) sel.value = upcoming.id;
+    sel.dataset.init = '1';
+  }
+
+  function filtered() {
+    const sid = $('#fSes').value, st = $('#fState').value;
+    const q = $('#fQ').value.trim().toLowerCase();
+    return data.rows.filter(r => {
+      if (sid && r.buoiId !== sid) return false;
+      if (st === 'yes' && !isTrue(r.checkin)) return false;
+      if (st === 'no' && isTrue(r.checkin)) return false;
+      if (q) {
+        const hay = [r.ma, r.hoTen, r.lop, r.truong, r.phuHuynh, r.sdt].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function render() {
+    const sid = $('#fSes').value;
+    const base = sid ? data.rows.filter(r => r.buoiId === sid) : data.rows;
+    const people = base.length;
+    const arrived = base.filter(r => isTrue(r.checkin)).length;
+    $('#stReg').textContent = people;
+    $('#stPeople').textContent = people - arrived;
+    $('#stIn').textContent = arrived;
+    const s = sid && sesById(sid);
+    $('#stLeft').textContent = s ? Math.max(0, (+s.sucChua || 0) - people) + '/' + (+s.sucChua || 0) : '–';
+    $('#stLeftLbl').textContent = s ? 'Chỗ còn trống' : 'Chọn 1 suất để xem chỗ trống';
+    $('#xlsOne').disabled = !sid;
+
+    const rows = filtered().slice().sort((a, b) => String(a.thoiGian).localeCompare(String(b.thoiGian)));
+    const tb = $('#tbody');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Chưa có lượt đăng ký nào phù hợp.</td></tr>'; return; }
+    tb.innerHTML = rows.map((r, i) => {
+      const on = isTrue(r.checkin), ses = sesById(r.buoiId);
+      const lt = [r.lop, r.truong].filter(Boolean).join(' – ');
+      const by = r.vaiTro === 'Phụ huynh' ? ' <span class="sub">(PH đăng ký)</span>' : '';
+      return '<tr class="' + (on ? 'done' : '') + '">' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td class="mono">' + esc(r.ma) + '</td>' +
+        '<td><b>' + esc(r.hoTen) + '</b>' + (lt ? '<div class="sub">' + esc(lt) + '</div>' : '') + '</td>' +
+        '<td>' + (r.phuHuynh ? esc(r.phuHuynh) : '<span class="sub">—</span>') + by +
+          '<div class="mono sub"><a href="tel:' + esc(r.sdt) + '">' + esc(r.sdt) + '</a></div></td>' +
+        '<td>' + esc([(ses ? ses.gio : r.gio), fmtDate(r.ngay)].filter(Boolean).join(' ')) +
+          '<div class="sub">' + esc(ses ? ses.ten : r.tenBuoi) + '</div></td>' +
+        '<td class="mono">' + esc(r.thoiGian) + '</td>' +
+        '<td><button class="btn sm ckbtn' + (on ? ' on' : '') + '" data-ma="' + esc(r.ma) + '" type="button">' +
+          (on ? '✓ Đã đến' : 'Check-in') + '</button></td></tr>';
+    }).join('');
+  }
+
+  $('#fSes').onchange = render;
+  $('#fState').onchange = render;
+  $('#fQ').oninput = render;
+  $('#reloadBtn').onclick = () => load();
+
+  $('#tbody').addEventListener('click', async e => {
+    const b = e.target.closest('.ckbtn'); if (!b) return;
+    const r = data.rows.find(x => x.ma === b.dataset.ma); if (!r) return;
+    const next = !isTrue(r.checkin);
+    if (!next && !confirm('Huỷ check-in của ' + r.hoTen + '?')) return;
+    b.disabled = true; b.textContent = '…';
+    try {
+      const res = await API.checkin(key, r.ma, next);
+      r.checkin = res.checkin; r.gioCheckin = res.gioCheckin;
+    } catch (err) { alert(err.message); }
+    render();
+  });
+
+  /* ---------------- XUẤT EXCEL ---------------- */
+  const COLS = [
+    ['hoTen', 'Họ và tên', 24], ['lop', 'Lớp', 7], ['truong', 'Trường', 24], ['phuHuynh', 'Phụ huynh', 22],
+    ['sdt', 'Số điện thoại', 13], ['vaiTro', 'Người đăng ký', 12], ['ngay', 'Ngày', 11], ['gio', 'Giờ', 7],
+    ['tenBuoi', 'Nội dung', 34], ['ma', 'Mã ĐK', 10], ['thoiGian', 'Thời gian ĐK', 19],
+    ['checkin', 'Đã đến', 8], ['gioCheckin', 'Giờ check-in', 19]
+  ];
+  function cell(r, k) {
+    if (k === 'checkin') return isTrue(r.checkin) ? 'Có' : '';
+    if (k === 'ngay') return fmtDate(r.ngay);
+    if (k === 'gio') { const s = sesById(r.buoiId); return r.gio || (s ? s.gio : ''); }
+    if (k === 'tenBuoi') { const s = sesById(r.buoiId); return s ? s.ten : (r.tenBuoi || ''); }
+    return r[k] == null ? '' : String(r[k]);
+  }
+  function makeSheet(rows) {
+    const sorted = rows.slice().sort((a, b) => String(a.thoiGian).localeCompare(String(b.thoiGian)));
+    const aoa = [['STT'].concat(COLS.map(c => c[1]))].concat(sorted.map((r, i) => [i + 1].concat(COLS.map(c => cell(r, c[0])))));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 5 }].concat(COLS.map(c => ({ wch: c[2] })));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(1, aoa.length - 1), c: COLS.length } }) };
+    return ws;
+  }
+  function summarySheet(list) {
+    const head = ['Mã suất', 'Ngày', 'Giờ', 'Nội dung', 'Địa điểm', 'Sức chứa', 'Đã đăng ký', 'Đã đến', 'Còn trống'];
+    const body = list.map(s => {
+      const rs = data.rows.filter(r => r.buoiId === s.id);
+      const inn = rs.filter(r => isTrue(r.checkin)).length;
+      return [s.id, fmtDate(s.ngay), s.gio || '', s.ten, s.diaDiem || '', +s.sucChua || 0, rs.length, inn, Math.max(0, (+s.sucChua || 0) - rs.length)];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([head].concat(body));
+    ws['!cols'] = [8, 11, 7, 38, 28, 9, 11, 8, 10].map(w => ({ wch: w }));
+    return ws;
+  }
+  function sheetName(s, used) {
+    let base = ((s.ngay ? fmtDate(s.ngay).slice(0, 5).replace('/', '-') + ' ' : '') + (s.gio ? s.gio.replace(':', 'h') + ' ' : '') + (s.ten || s.id))
+      .replace(/[\[\]:*?\/\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'Buoi';
+    let name = base, i = 2;
+    while (used.has(name.toLowerCase())) { const suf = ' (' + i++ + ')'; name = base.slice(0, 31 - suf.length) + suf; }
+    used.add(name.toLowerCase());
+    return name;
+  }
+  function slug(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 40);
+  }
+  function exportExcel(onlyId) {
+    if (!window.XLSX) { alert('Chưa tải được thư viện Excel — kiểm tra Internet rồi thử lại.'); return; }
+    const wb = XLSX.utils.book_new();
+    const used = new Set(['tổng hợp', 'tất cả']);
+    let file;
+    if (onlyId) {
+      const s = sesById(onlyId);
+      XLSX.utils.book_append_sheet(wb, makeSheet(data.rows.filter(r => r.buoiId === onlyId)), sheetName(s, used));
+      XLSX.utils.book_append_sheet(wb, summarySheet([s]), 'Tổng hợp');
+      file = 'dang-ky_' + (s.ngay || '') + '_' + (s.gio || '').replace(':', 'h') + '_' + slug(s.ten) + '.xlsx';
+    } else {
+      const list = sortedSessions();
+      XLSX.utils.book_append_sheet(wb, summarySheet(list), 'Tổng hợp');
+      XLSX.utils.book_append_sheet(wb, makeSheet(data.rows), 'Tất cả');
+      list.forEach(s => XLSX.utils.book_append_sheet(wb, makeSheet(data.rows.filter(r => r.buoiId === s.id)), sheetName(s, used)));
+      file = 'dang-ky-ngam-sao_' + todayStr() + '.xlsx';
+    }
+    XLSX.writeFile(wb, file);
+  }
+  $('#xlsAll').onclick = () => exportExcel('');
+  $('#xlsOne').onclick = () => { const id = $('#fSes').value; if (id) exportExcel(id); };
+
+  if (API.remote && !key) showLogin(); else load(API.remote);
+})();
+</script>
+</body>
+</html>
