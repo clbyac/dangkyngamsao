@@ -3,7 +3,7 @@
   const CFG = window.APP_CONFIG || {};
   const REMOTE = /^https:\/\/script\.google(usercontent)?\.com\//.test(CFG.scriptUrl || '');
 
-   const mem = {};
+  const mem = {};
   function sget(k) {
     try { const v = localStorage.getItem(k); if (v != null) return JSON.parse(v); } catch (e) {}
     return k in mem ? mem[k] : null;
@@ -53,11 +53,10 @@
     const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5] - han);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
-  /** '16:45' hoặc '16:45 31/10' nếu hạn rơi vào ngày khác ngày quan sát */
+
   function fmtDeadline(s) {
     const k = deadlineKey(s); if (!k) return '';
-    const hm = k.slice(11), day = k.slice(0, 10);
-    return day === s.ngay ? hm : hm + ' ' + day.slice(8, 10) + '/' + day.slice(5, 7);
+    return k.slice(11) + ' ngày ' + k.slice(8, 10) + '/' + k.slice(5, 7);
   }
 
   function sessionStatus(s) {
@@ -117,7 +116,6 @@
     if (st === 'closed' || st === 'past') throw new Error('Suất này đã đóng đăng ký.');
     if (st === 'expired') throw new Error('Đã hết hạn đăng ký suất này (hạn lúc ' + fmtDeadline(ses) + ').');
     const regs = localRegs();
-    // cùng SĐT được phép (anh chị em dùng chung số phụ huynh), chỉ chặn trùng cả SĐT lẫn tên
     const dup = regs.find(r => r.buoiId === x.buoiId && r.sdt === x.sdt && sameName(r.hoTen, x.hoTen));
     if (dup) throw new Error(dup.hoTen + ' đã đăng ký suất này rồi (mã ' + dup.ma + ').');
     if (ses.conLai <= 0) throw new Error('Suất này đã đủ người.');
@@ -139,7 +137,6 @@
   async function post(payload) {
     let r;
     try {
-      // text/plain để tránh preflight CORS với Apps Script
       r = await fetch(CFG.scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
     } catch (e) { throw new Error('Không kết nối được máy chủ. Kiểm tra Internet rồi thử lại.'); }
     return readJson(r);
