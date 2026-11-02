@@ -45,7 +45,6 @@ a { color: var(--accent); }
 .muted { color: var(--muted); }
 [hidden] { display: none !important; }
 
-/* ---------- header ---------- */
 .hero { margin-bottom: 24px; }
 .eyebrow { margin: 0 0 6px; color: var(--accent); font-weight: 600; font-size: .82rem; letter-spacing: .14em; text-transform: uppercase; }
 h1 { margin: 0 0 10px; font-size: clamp(2rem, 6vw, 3rem); line-height: 1.12; font-weight: 800; letter-spacing: -.02em; }
@@ -93,7 +92,7 @@ html.red .ses:has(input:checked) { background: rgba(255, 0, 0, .08); }
 .ses-date .d { font-size: 1.6rem; font-weight: 800; }
 .ses-date .m { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
 .ses-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ses-body strong { font-size: 1.02rem; }
+.ses-body strong { font-size: 1.02rem; padding-right: 30px; }
 .meta { color: var(--muted); font-size: .9rem; }
 .meta.note { color: var(--text); opacity: .8; }
 .meta.deadline { color: var(--accent); }
