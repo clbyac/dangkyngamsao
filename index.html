@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" defer></script>
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -35,6 +36,7 @@
           <div class="seg" role="radiogroup" aria-label="Người đăng ký">
             <label><input type="radio" name="vaiTro" value="Học sinh" checked><span>Học sinh</span></label>
             <label><input type="radio" name="vaiTro" value="Phụ huynh"><span>Phụ huynh</span></label>
+            <label><input type="radio" name="vaiTro" value="Thầy cô"><span>Thầy cô</span></label>
           </div>
         </div>
         <label class="field full"><span>Họ và tên học sinh <span class="req">*</span></span>
@@ -46,7 +48,7 @@
         <label class="field"><span>Trường <span class="req">*</span></span>
           <input name="truong" maxlength="120" placeholder="VD: THCS Nguyễn Du">
         </label>
-        <label class="field"><span>Họ tên phụ huynh <span class="req ph">*</span></span>
+        <label class="field"><span>Họ tên phụ huynh / thầy cô <span class="req ph">*</span></span>
           <input name="phuHuynh" maxlength="100" data-ph="Không bắt buộc">
         </label>
         <label class="field"><span>Số điện thoại <span class="req">*</span></span>
@@ -68,6 +70,12 @@
     <p class="muted">Mã đăng ký của bạn — hãy chụp màn hình lại để check-in.</p>
     <div class="code" id="tCode"></div>
     <div class="tdetail" id="tDetail"></div>
+    <div class="zalo" id="tZalo" hidden>
+      <p><b>Tham gia nhóm Zalo của suất này</b> để nhận thông báo (đổi giờ, trời mây…).</p>
+      <a class="btn primary" id="tZaloLink" href="#" target="_blank" rel="noopener">Vào nhóm Zalo</a>
+      <div class="qr" id="tZaloQr" aria-label="Mã QR nhóm Zalo"></div>
+      <p class="muted small" id="tZaloHint">Đăng ký trên máy tính? Quét mã QR bằng Zalo trên điện thoại.</p>
+    </div>
     <ul class="tips">
       <li>Có mặt sớm 10–15 phút để kịp nghe hướng dẫn.</li>
       <li>Suất tối: mang áo ấm, Tây Nguyên về đêm khá lạnh.</li>
@@ -147,9 +155,8 @@
 
   box.addEventListener('change', () => { box.classList.remove('invalid'); say(''); });
   form.addEventListener('input', e => { e.target.classList && e.target.classList.remove('invalid'); });
-  // Phụ huynh đăng ký → ô "Họ tên phụ huynh" không bắt buộc
   function syncRole() {
-    const ph = form.querySelector('input[name=vaiTro]:checked').value === 'Phụ huynh';
+    const ph = form.querySelector('input[name=vaiTro]:checked').value !== 'Học sinh';
     const el = form.elements.phuHuynh;
     if (el.dataset.hs == null) el.dataset.hs = el.placeholder;
     form.classList.toggle('is-ph', ph);
@@ -165,7 +172,7 @@
     if (t(d.hoTen).length < 2) return [form.elements.hoTen, 'Vui lòng nhập họ và tên học sinh.'];
     if (!t(d.lop)) return [form.elements.lop, 'Vui lòng nhập lớp.'];
     if (t(d.truong).length < 2) return [form.elements.truong, 'Vui lòng nhập trường.'];
-    if (d.vaiTro !== 'Phụ huynh' && t(d.phuHuynh).length < 2) return [form.elements.phuHuynh, 'Vui lòng nhập họ tên phụ huynh.'];
+    if (d.vaiTro === 'Học sinh' && t(d.phuHuynh).length < 2) return [form.elements.phuHuynh, 'Vui lòng nhập họ tên phụ huynh / thầy cô.'];
     if (!PHONE_RE.test(normalizePhone(d.sdt))) return [form.elements.sdt, 'Số điện thoại chưa đúng (10 số, bắt đầu bằng 0).'];
     const s = sessions.find(x => x.id === d.buoiId);
     if (s && s.conLai < 1) return [box, 'Suất này vừa hết chỗ — vui lòng chọn suất khác.'];
@@ -175,7 +182,7 @@
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(form));
-    if (d.website) return; // bẫy bot
+    if (d.website) return;
     const bad = validate(d);
     if (bad) {
       bad[0].classList.add('invalid');
@@ -190,7 +197,7 @@
       showTicket(res, d);
     } catch (err) {
       say(err.message, 'err');
-      loadSessions(); // cập nhật số chỗ còn lại
+      loadSessions();
     } finally {
       btn.disabled = false; btn.textContent = 'Đăng ký';
     }
@@ -203,14 +210,28 @@
     const rows = [
       ['Học sinh', t(d.hoTen)],
       ['Lớp – Trường', [t(d.lop), t(d.truong)].filter(Boolean).join(' – ')],
-      ['Phụ huynh', t(d.phuHuynh)],
+      [d.vaiTro === 'Thầy cô' ? 'Thầy cô' : 'Phụ huynh', t(d.phuHuynh)],
       ['Nội dung', s.ten],
       ['Thời gian', [s.gio, fmtDate(s.ngay, true)].filter(Boolean).join(' · ')],
       ['Địa điểm', s.diaDiem]
     ].filter(r => r[1]);
     $('#tDetail').innerHTML = rows.map(r => '<div><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('');
+    showZalo(s.zalo);
     form.hidden = true; $('#ticket').hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showZalo(url) {
+    const box = $('#tZalo'), qr = $('#tZaloQr');
+    url = /^https?:\/\/\S+$/i.test(String(url || '').trim()) ? String(url).trim() : '';
+    box.hidden = !url; qr.innerHTML = '';
+    if (!url) return;
+    $('#tZaloLink').href = url;
+    try {
+      const q = qrcode(0, 'M'); q.addData(url); q.make();
+      qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      $('#tZaloHint').hidden = false;
+    } catch (e) { $('#tZaloHint').hidden = true; }
   }
 
   $('#againBtn').onclick = () => {
