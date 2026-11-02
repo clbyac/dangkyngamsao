@@ -3,86 +3,89 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Quản lý đăng ký</title>
+<title>Đăng ký ngắm sao</title>
+<meta name="description" content="Đăng ký tham gia buổi ngắm sao">
 <meta name="theme-color" content="#060a17">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" defer></script>
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
-<main class="wrap wide">
-  <header class="hero topbar">
-    <div>
-      <p class="eyebrow" id="organizer"></p>
-      <h1>Quản lý đăng ký</h1>
-    </div>
-    <div class="right">
-      <button class="btn sm" id="redBtn" type="button" title="Đổi giao diện sang đèn đỏ khi check-in ngoài trời">● Đèn đỏ</button>
-      <button class="btn sm" id="logoutBtn" type="button" hidden>Đăng xuất</button>
-    </div>
+<main class="wrap">
+  <header class="hero">
+    <p class="eyebrow" id="organizer"></p>
+    <h1 id="title">Đăng ký ngắm sao</h1>
+    <p class="lead" id="intro"></p>
   </header>
 
-  <div id="demoBanner" class="banner" hidden>
-    <b>Chế độ thử:</b> đang xem dữ liệu lưu trên trình duyệt này, không có mật khẩu.
-    <button type="button" class="linkbtn" id="clearDemo">Xoá dữ liệu thử</button>
-  </div>
+  <form id="regForm" class="card" novalidate>
+    <section>
+      <h2><span class="step">1</span> Chọn suất</h2>
+      <div id="sessions" class="sessions" role="radiogroup" aria-label="Suất">
+        <p class="muted">Đang tải lịch…</p>
+      </div>
+    </section>
 
-  <form id="loginForm" class="card login" hidden>
-    <h2>Đăng nhập</h2>
-    <label class="field">Mật khẩu quản trị (ADMIN_KEY)
-      <input type="password" name="key" autocomplete="current-password">
-    </label>
-    <div class="actions" style="margin-top:6px">
-      <button class="btn primary" type="submit" id="loginBtn">Vào trang quản lý</button>
-      <span class="msg" id="loginMsg"></span>
+    <section>
+      <h2><span class="step">2</span> Thông tin của bạn</h2>
+      <div class="grid">
+        <div class="field full"><span>Người đăng ký</span>
+          <div class="seg" role="radiogroup" aria-label="Người đăng ký">
+            <label><input type="radio" name="vaiTro" value="Học sinh" checked><span>Học sinh</span></label>
+            <label><input type="radio" name="vaiTro" value="Phụ huynh"><span>Phụ huynh</span></label>
+            <label><input type="radio" name="vaiTro" value="Thầy cô"><span>Thầy cô</span></label>
+          </div>
+        </div>
+        <label class="field full"><span>Họ và tên học sinh <span class="req">*</span></span>
+          <input name="hoTen" autocomplete="off" maxlength="100">
+        </label>
+        <label class="field"><span>Lớp <span class="req">*</span></span>
+          <input name="lop" maxlength="20" placeholder="VD: 8A2">
+        </label>
+        <label class="field"><span>Trường <span class="req">*</span></span>
+          <input name="truong" maxlength="120" placeholder="VD: THCS Nguyễn Du">
+        </label>
+        <label class="field"><span>Họ tên phụ huynh / thầy cô <span class="req ph">*</span></span>
+          <input name="phuHuynh" maxlength="100" data-ph="Không bắt buộc">
+        </label>
+        <label class="field"><span>Số điện thoại <span class="req">*</span></span>
+          <input name="sdt" type="tel" inputmode="tel" autocomplete="tel" placeholder="0912 345 678" maxlength="16">
+        </label>
+      </div>
+      <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary lg" id="submitBtn" type="submit">Đăng ký</button>
+      <span id="formMsg" class="msg" role="status" aria-live="polite"></span>
     </div>
   </form>
 
-  <div id="app" hidden>
-    <div class="stats">
-      <div class="stat"><b id="stReg">0</b><span>Lượt đăng ký</span></div>
-      <div class="stat"><b id="stPeople">0</b><span>Chưa đến</span></div>
-      <div class="stat"><b id="stIn">0</b><span>Đã đến</span></div>
-      <div class="stat"><b id="stLeft">–</b><span id="stLeftLbl">Chỗ còn trống</span></div>
+  <section id="ticket" class="card ticket" hidden aria-live="polite">
+    <div class="ok-ic">✓</div>
+    <h2>Đăng ký thành công!</h2>
+    <p class="muted">Mã đăng ký của bạn — hãy chụp màn hình lại để check-in.</p>
+    <div class="code" id="tCode"></div>
+    <div class="tdetail" id="tDetail"></div>
+    <div class="zalo" id="tZalo" hidden>
+      <p><b>Tham gia nhóm Zalo của suất này</b> để nhận thông báo (đổi giờ, trời mây…).</p>
+      <a class="btn primary" id="tZaloLink" href="#" target="_blank" rel="noopener">Vào nhóm Zalo</a>
+      <div class="qr" id="tZaloQr" aria-label="Mã QR nhóm Zalo"></div>
+      <p class="muted small" id="tZaloHint">Đăng ký trên máy tính? Quét mã QR bằng Zalo trên điện thoại.</p>
     </div>
-
-    <div class="toolbar">
-      <select id="fSes" aria-label="Lọc theo suất"></select>
-      <select id="fState" aria-label="Lọc trạng thái" style="flex:0 1 160px">
-        <option value="">Tất cả</option>
-        <option value="no">Chưa đến</option>
-        <option value="yes">Đã đến</option>
-      </select>
-      <input id="fQ" type="search" placeholder="Tìm tên, lớp, trường, SĐT, mã…" aria-label="Tìm kiếm">
+    <ul class="tips">
+      <li>Có mặt sớm 10–15 phút để kịp nghe hướng dẫn.</li>
+      <li>Suất tối: mang áo ấm, Tây Nguyên về đêm khá lạnh.</li>
+      <li>Hạn chế dùng đèn pin trắng và màn hình sáng — mắt cần 15–20 phút để thích nghi bóng tối.</li>
+      <li>Nếu trời mây, phần ngắm sao có thể thay đổi; ban tổ chức sẽ báo qua số điện thoại đã đăng ký.</li>
+    </ul>
+    <div class="actions" style="justify-content:center">
+      <button class="btn" id="againBtn" type="button">Đăng ký thêm người khác</button>
     </div>
-    <div class="toolbar">
-      <button class="btn primary" id="xlsAll" type="button">⬇ Xuất Excel (tất cả suất)</button>
-      <button class="btn" id="xlsOne" type="button">⬇ Xuất suất đang chọn</button>
-      <button class="btn" id="copyPhones" type="button" title="Sao chép SĐT theo bộ lọc đang chọn">📋 Sao chép SĐT</button>
-      <button class="btn" id="smsBtn" type="button" title="Mở ứng dụng Tin nhắn trên điện thoại với danh sách SĐT theo bộ lọc">✉ Soạn SMS</button>
-      <span class="spacer"></span>
-      <span class="msg muted" id="appMsg"></span>
-      <button class="btn sm" id="reloadBtn" type="button">↻ Làm mới</button>
-    </div>
-
-    <div class="tablewrap">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Mã</th><th>Học sinh</th><th>Phụ huynh, thầy cô / SĐT</th><th>Suất</th><th>Đăng ký lúc</th><th>Check-in</th>
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <footer>
-    <span id="contact"></span>
-    <a href="index.html">← Trang đăng ký</a>
-  </footer>
+  </section>
 </main>
 
 <script src="config.js"></script>
@@ -90,241 +93,154 @@
 <script>
 (function () {
   'use strict';
-  const { CFG, API, esc, fmtDate, todayStr, isTrue } = NS;
+  const { CFG, API, esc, pad, parseDate, weekday, fmtDate, sessionStatus, fmtDeadline, normalizePhone, PHONE_RE } = NS;
   const $ = s => document.querySelector(s);
-  let key = '';
-  try { key = sessionStorage.getItem('ngamsao_key') || ''; } catch (e) {}
-  let data = { sessions: [], rows: [] };
+  const form = $('#regForm'), box = $('#sessions'), btn = $('#submitBtn'), msg = $('#formMsg');
+  let sessions = [];
 
+  document.title = CFG.title || document.title;
+  $('#title').textContent = CFG.title || 'Đăng ký ngắm sao';
   $('#organizer').textContent = CFG.organizer || '';
-  $('#contact').textContent = CFG.contact || '';
+  $('#intro').textContent = CFG.intro || '';
+  if ($('#contact')) $('#contact').textContent = CFG.contact || '';
+  if (!API.remote && $('#demoBanner')) $('#demoBanner').hidden = false;
   NS.sky();
-  const syncRedBtn = () => { $('#redBtn').textContent = NS.isRed() ? '○ Giao diện thường' : '● Đèn đỏ'; };
-  syncRedBtn();
-  $('#redBtn').onclick = () => { NS.setRed(!NS.isRed()); syncRedBtn(); };
 
-  if (!API.remote) {
-    $('#demoBanner').hidden = false;
-    $('#clearDemo').onclick = () => { if (confirm('Xoá toàn bộ dữ liệu thử trên trình duyệt này?')) { API.clearDemo(); load(); } };
-  }
+  function say(text, kind) { msg.textContent = text || ''; msg.className = 'msg' + (kind ? ' ' + kind : ''); }
 
-  function showLogin(err) {
-    $('#app').hidden = true; $('#loginForm').hidden = false; $('#logoutBtn').hidden = true;
-    $('#loginMsg').textContent = err || ''; $('#loginMsg').className = 'msg' + (err ? ' err' : '');
-    $('#loginForm').elements.key.focus();
-  }
-  $('#loginForm').addEventListener('submit', e => {
-    e.preventDefault();
-    key = $('#loginForm').elements.key.value.trim();
-    if (key) load(true);
-  });
-  $('#logoutBtn').onclick = () => {
-    key = ''; try { sessionStorage.removeItem('ngamsao_key'); } catch (e) {}
-    $('#loginForm').reset(); showLogin();
-  };
-
-  async function load(fromLogin) {
-    const lb = $('#loginBtn'), m = $('#appMsg');
-    if (fromLogin) { lb.disabled = true; lb.textContent = 'Đang kiểm tra…'; }
-    m.textContent = 'Đang tải…';
+  async function loadSessions() {
+    const keep = form.querySelector('input[name=buoiId]:checked');
+    const keepId = keep ? keep.value : '';
     try {
-      const res = await API.list(key);
-      data = { sessions: res.sessions || [], rows: res.rows || [] };
-      if (API.remote) { try { sessionStorage.setItem('ngamsao_key', key); } catch (e) {} $('#logoutBtn').hidden = false; }
-      $('#loginForm').hidden = true; $('#app').hidden = false;
-      fillSessionFilter(); render();
-      m.textContent = 'Cập nhật lúc ' + new Date().toLocaleTimeString('vi-VN');
-    } catch (err) {
-      m.textContent = '';
-      if (API.remote && (fromLogin || /mật khẩu/i.test(err.message))) showLogin(err.message);
-      else alert(err.message);
-    } finally {
-      if (fromLogin) { lb.disabled = false; lb.textContent = 'Vào trang quản lý'; }
+      sessions = await API.sessions();
+      renderSessions(keepId);
+    } catch (e) {
+      box.innerHTML = '<p class="err">Không tải được lịch: ' + esc(e.message) +
+        ' <button type="button" class="linkbtn" id="retry">Thử lại</button></p>';
+      $('#retry').onclick = loadSessions;
     }
   }
 
-  const sesById = id => data.sessions.find(s => s.id === id);
-  const sortedSessions = () => data.sessions.slice().sort((a, b) => NS.startKey(a).localeCompare(NS.startKey(b)));
-  const sesLabel = s => [s.gio, fmtDate(s.ngay)].filter(Boolean).join(' ') + ' — ' + s.ten;
-
-  function fillSessionFilter() {
-    const sel = $('#fSes'), cur = sel.value;
-    const upcoming = sortedSessions().find(s => !s.ngay || s.ngay >= todayStr());
-    sel.innerHTML = '<option value="">Tất cả suất (' + data.rows.length + ' lượt)</option>' +
-      sortedSessions().map(s => {
-        const n = data.rows.filter(r => r.buoiId === s.id).length;
-        return '<option value="' + esc(s.id) + '">' + esc(sesLabel(s)) + ' (' + n + '/' + (+s.sucChua || 0) + ')</option>';
-      }).join('');
-    if (cur && sesById(cur)) sel.value = cur;
-    else if (!sel.dataset.init && upcoming) sel.value = upcoming.id;
-    sel.dataset.init = '1';
-  }
-
-  function filtered() {
-    const sid = $('#fSes').value, st = $('#fState').value;
-    const q = $('#fQ').value.trim().toLowerCase();
-    return data.rows.filter(r => {
-      if (sid && r.buoiId !== sid) return false;
-      if (st === 'yes' && !isTrue(r.checkin)) return false;
-      if (st === 'no' && isTrue(r.checkin)) return false;
-      if (q) {
-        const hay = [r.ma, r.hoTen, r.lop, r.truong, r.phuHuynh, r.sdt].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }
-
-  function render() {
-    const sid = $('#fSes').value;
-    const base = sid ? data.rows.filter(r => r.buoiId === sid) : data.rows;
-    const people = base.length;
-    const arrived = base.filter(r => isTrue(r.checkin)).length;
-    $('#stReg').textContent = people;
-    $('#stPeople').textContent = people - arrived;
-    $('#stIn').textContent = arrived;
-    const s = sid && sesById(sid);
-    $('#stLeft').textContent = s ? Math.max(0, (+s.sucChua || 0) - people) + '/' + (+s.sucChua || 0) : '–';
-    $('#stLeftLbl').textContent = s ? 'Chỗ còn trống' : 'Chọn 1 suất để xem chỗ trống';
-    $('#xlsOne').disabled = !sid;
-
-    const rows = filtered().slice().sort((a, b) => String(a.thoiGian).localeCompare(String(b.thoiGian)));
-    const tb = $('#tbody');
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Chưa có lượt đăng ký nào phù hợp.</td></tr>'; return; }
-    tb.innerHTML = rows.map((r, i) => {
-      const on = isTrue(r.checkin), ses = sesById(r.buoiId);
-      const lt = [r.lop, r.truong].filter(Boolean).join(' – ');
-      const by = r.vaiTro === 'Phụ huynh' ? ' <span class="sub">(PH đăng ký)</span>'
-               : r.vaiTro === 'Thầy cô' ? ' <span class="sub">(Thầy cô đăng ký)</span>' : '';
-      return '<tr class="' + (on ? 'done' : '') + '">' +
-        '<td>' + (i + 1) + '</td>' +
-        '<td class="mono">' + esc(r.ma) + '</td>' +
-        '<td><b>' + esc(r.hoTen) + '</b>' + (lt ? '<div class="sub">' + esc(lt) + '</div>' : '') + '</td>' +
-        '<td>' + (r.phuHuynh ? esc(r.phuHuynh) : '<span class="sub">—</span>') + by +
-          '<div class="mono sub"><a href="tel:' + esc(r.sdt) + '">' + esc(r.sdt) + '</a></div></td>' +
-        '<td>' + esc([(ses ? ses.gio : r.gio), fmtDate(r.ngay)].filter(Boolean).join(' ')) +
-          '<div class="sub">' + esc(ses ? ses.ten : r.tenBuoi) + '</div></td>' +
-        '<td class="mono">' + esc(r.thoiGian) + '</td>' +
-        '<td><button class="btn sm ckbtn' + (on ? ' on' : '') + '" data-ma="' + esc(r.ma) + '" type="button">' +
-          (on ? '✓ Đã đến' : 'Check-in') + '</button></td></tr>';
+  function renderSessions(keepId) {
+    const list = sessions.filter(s => sessionStatus(s) !== 'past')
+      .sort((a, b) => String(a.ngay).localeCompare(String(b.ngay)));
+    if (!list.length) {
+      box.innerHTML = '<p class="muted">Hiện chưa có suất nào mở đăng ký. Hẹn bạn lần sau!</p>';
+      btn.disabled = true; return;
+    }
+    btn.disabled = false;
+    box.innerHTML = list.map(s => {
+      const st = sessionStatus(s), d = parseDate(s.ngay);
+      const cap = +s.sucChua || 0, used = +s.daDangKy || 0;
+      const pct = cap ? Math.min(100, used / cap * 100) : 0;
+      const han = fmtDeadline(s);
+      const label = st === 'open' ? 'Còn ' + s.conLai + '/' + cap + ' chỗ'
+                  : st === 'full' ? 'Hết chỗ'
+                  : st === 'expired' ? 'Hết hạn đăng ký' : 'Đã đóng đăng ký';
+      const off = st !== 'open';
+      return '<label class="ses ' + (off ? 'is-off ' : '') + (st === 'full' ? 'full' : '') + '">' +
+        '<input type="radio" name="buoiId" value="' + esc(s.id) + '"' + (off ? ' disabled' : '') +
+          (!off && s.id === keepId ? ' checked' : '') + '>' +
+        '<div class="ses-date"><span class="d">' + (d ? pad(d.getDate()) : '?') + '</span><span class="m">' +
+          (d ? 'Th ' + (d.getMonth() + 1) : '') + '</span></div>' +
+        '<div class="ses-body"><strong>' + esc(s.ten) + '</strong>' +
+          '<span class="meta">' + esc(weekday(s.ngay)) + (s.gio ? ' · ' + esc(s.gio) : '') + '</span>' +
+          (s.diaDiem ? '<span class="meta">' + esc(s.diaDiem) + '</span>' : '') +
+          (han && st !== 'expired' ? '<span class="meta deadline">Hạn đăng ký: trước ' + esc(han) + '</span>' : '') +
+          (s.ghiChu ? '<span class="meta note">' + esc(s.ghiChu) + '</span>' : '') +
+          '<div class="cap"><div class="bar"><i style="width:' + pct.toFixed(0) + '%"></i></div><span>' + label + '</span></div>' +
+        '</div><span class="tick" aria-hidden="true">✓</span></label>';
     }).join('');
   }
 
-  $('#fSes').onchange = render;
-  $('#fState').onchange = render;
-  $('#fQ').oninput = render;
-  $('#reloadBtn').onclick = () => load();
+  box.addEventListener('change', () => { box.classList.remove('invalid'); say(''); });
+  form.addEventListener('input', e => { e.target.classList && e.target.classList.remove('invalid'); });
+  function syncRole() {
+    const ph = form.querySelector('input[name=vaiTro]:checked').value !== 'Học sinh';
+    const el = form.elements.phuHuynh;
+    if (el.dataset.hs == null) el.dataset.hs = el.placeholder;
+    form.classList.toggle('is-ph', ph);
+    el.placeholder = ph ? el.dataset.ph : el.dataset.hs;
+    if (ph) el.classList.remove('invalid');
+  }
+  form.querySelectorAll('input[name=vaiTro]').forEach(r => r.addEventListener('change', syncRole));
+  syncRole();
 
-  $('#tbody').addEventListener('click', async e => {
-    const b = e.target.closest('.ckbtn'); if (!b) return;
-    const r = data.rows.find(x => x.ma === b.dataset.ma); if (!r) return;
-    const next = !isTrue(r.checkin);
-    if (!next && !confirm('Huỷ check-in của ' + r.hoTen + '?')) return;
-    b.disabled = true; b.textContent = '…';
+  function validate(d) {
+    const t = v => String(v || '').trim();
+    if (!d.buoiId) return [box, 'Vui lòng chọn suất.'];
+    if (t(d.hoTen).length < 2) return [form.elements.hoTen, 'Vui lòng nhập họ và tên học sinh.'];
+    if (!t(d.lop)) return [form.elements.lop, 'Vui lòng nhập lớp.'];
+    if (t(d.truong).length < 2) return [form.elements.truong, 'Vui lòng nhập trường.'];
+    if (d.vaiTro === 'Học sinh' && t(d.phuHuynh).length < 2) return [form.elements.phuHuynh, 'Vui lòng nhập họ tên phụ huynh / thầy cô.'];
+    if (!PHONE_RE.test(normalizePhone(d.sdt))) return [form.elements.sdt, 'Số điện thoại chưa đúng (10 số, bắt đầu bằng 0).'];
+    const s = sessions.find(x => x.id === d.buoiId);
+    if (s && s.conLai < 1) return [box, 'Suất này vừa hết chỗ — vui lòng chọn suất khác.'];
+    return null;
+  }
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    if (d.website) return;
+    const bad = validate(d);
+    if (bad) {
+      bad[0].classList.add('invalid');
+      if (bad[0].focus && bad[0].tagName !== 'DIV' && bad[0].tagName !== 'LABEL') bad[0].focus();
+      else bad[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      say(bad[1], 'err'); return;
+    }
+    btn.disabled = true; btn.textContent = 'Đang gửi…'; say('');
     try {
-      const res = await API.checkin(key, r.ma, next);
-      r.checkin = res.checkin; r.gioCheckin = res.gioCheckin;
-    } catch (err) { alert(err.message); }
-    render();
+      delete d.website;
+      const res = await API.register(d);
+      showTicket(res, d);
+    } catch (err) {
+      say(err.message, 'err');
+      loadSessions();
+    } finally {
+      btn.disabled = false; btn.textContent = 'Đăng ký';
+    }
   });
 
-  /* ---------------- XUẤT EXCEL ---------------- */
-  const COLS = [
-    ['hoTen', 'Họ và tên', 24], ['lop', 'Lớp', 7], ['truong', 'Trường', 24], ['phuHuynh', 'Phụ huynh / Thầy cô', 22],
-    ['sdt', 'Số điện thoại', 13], ['vaiTro', 'Người đăng ký', 12], ['ngay', 'Ngày', 11], ['gio', 'Giờ', 7],
-    ['tenBuoi', 'Nội dung', 34], ['ma', 'Mã ĐK', 10], ['thoiGian', 'Thời gian ĐK', 19],
-    ['checkin', 'Đã đến', 8], ['gioCheckin', 'Giờ check-in', 19]
-  ];
-  function cell(r, k) {
-    if (k === 'checkin') return isTrue(r.checkin) ? 'Có' : '';
-    if (k === 'ngay') return fmtDate(r.ngay);
-    if (k === 'gio') { const s = sesById(r.buoiId); return r.gio || (s ? s.gio : ''); }
-    if (k === 'tenBuoi') { const s = sesById(r.buoiId); return s ? s.ten : (r.tenBuoi || ''); }
-    return r[k] == null ? '' : String(r[k]);
+  function showTicket(res, d) {
+    const s = res.session || sessions.find(x => x.id === d.buoiId) || {};
+    const t = v => String(v || '').trim();
+    $('#tCode').textContent = res.ma;
+    const rows = [
+      ['Học sinh', t(d.hoTen)],
+      ['Lớp – Trường', [t(d.lop), t(d.truong)].filter(Boolean).join(' – ')],
+      [d.vaiTro === 'Thầy cô' ? 'Thầy cô' : 'Phụ huynh', t(d.phuHuynh)],
+      ['Nội dung', s.ten],
+      ['Thời gian', [s.gio, fmtDate(s.ngay, true)].filter(Boolean).join(' · ')],
+      ['Địa điểm', s.diaDiem]
+    ].filter(r => r[1]);
+    $('#tDetail').innerHTML = rows.map(r => '<div><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('');
+    showZalo(s.zalo);
+    form.hidden = true; $('#ticket').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  function makeSheet(rows) {
-    const sorted = rows.slice().sort((a, b) => String(a.thoiGian).localeCompare(String(b.thoiGian)));
-    const aoa = [['STT'].concat(COLS.map(c => c[1]))].concat(sorted.map((r, i) => [i + 1].concat(COLS.map(c => cell(r, c[0])))));
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 5 }].concat(COLS.map(c => ({ wch: c[2] })));
-    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(1, aoa.length - 1), c: COLS.length } }) };
-    return ws;
-  }
-  function summarySheet(list) {
-    const head = ['Mã suất', 'Ngày', 'Giờ', 'Nội dung', 'Địa điểm', 'Sức chứa', 'Đã đăng ký', 'Đã đến', 'Còn trống'];
-    const body = list.map(s => {
-      const rs = data.rows.filter(r => r.buoiId === s.id);
-      const inn = rs.filter(r => isTrue(r.checkin)).length;
-      return [s.id, fmtDate(s.ngay), s.gio || '', s.ten, s.diaDiem || '', +s.sucChua || 0, rs.length, inn, Math.max(0, (+s.sucChua || 0) - rs.length)];
-    });
-    const ws = XLSX.utils.aoa_to_sheet([head].concat(body));
-    ws['!cols'] = [8, 11, 7, 38, 28, 9, 11, 8, 10].map(w => ({ wch: w }));
-    return ws;
-  }
-  function sheetName(s, used) {
-    let base = ((s.ngay ? fmtDate(s.ngay).slice(0, 5).replace('/', '-') + ' ' : '') + (s.gio ? s.gio.replace(':', 'h') + ' ' : '') + (s.ten || s.id))
-      .replace(/[\[\]:*?\/\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'Buoi';
-    let name = base, i = 2;
-    while (used.has(name.toLowerCase())) { const suf = ' (' + i++ + ')'; name = base.slice(0, 31 - suf.length) + suf; }
-    used.add(name.toLowerCase());
-    return name;
-  }
-  function slug(s) {
-    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
-      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 40);
-  }
-  function exportExcel(onlyId) {
-    if (!window.XLSX) { alert('Chưa tải được thư viện Excel — kiểm tra Internet rồi thử lại.'); return; }
-    const wb = XLSX.utils.book_new();
-    const used = new Set(['tổng hợp', 'tất cả']);
-    let file;
-    if (onlyId) {
-      const s = sesById(onlyId);
-      XLSX.utils.book_append_sheet(wb, makeSheet(data.rows.filter(r => r.buoiId === onlyId)), sheetName(s, used));
-      XLSX.utils.book_append_sheet(wb, summarySheet([s]), 'Tổng hợp');
-      file = 'dang-ky_' + (s.ngay || '') + '_' + (s.gio || '').replace(':', 'h') + '_' + slug(s.ten) + '.xlsx';
-    } else {
-      const list = sortedSessions();
-      XLSX.utils.book_append_sheet(wb, summarySheet(list), 'Tổng hợp');
-      XLSX.utils.book_append_sheet(wb, makeSheet(data.rows), 'Tất cả');
-      list.forEach(s => XLSX.utils.book_append_sheet(wb, makeSheet(data.rows.filter(r => r.buoiId === s.id)), sheetName(s, used)));
-      file = 'dang-ky-ngam-sao_' + todayStr() + '.xlsx';
-    }
-    XLSX.writeFile(wb, file);
-  }
-  $('#xlsAll').onclick = () => exportExcel('');
-  $('#xlsOne').onclick = () => { const id = $('#fSes').value; if (id) exportExcel(id); };
 
-  function phones() { return Array.from(new Set(filtered().map(r => r.sdt).filter(Boolean))); }
-  function note(t) { $('#appMsg').textContent = t; }
+  function showZalo(url) {
+    const box = $('#tZalo'), qr = $('#tZaloQr');
+    url = /^https?:\/\/\S+$/i.test(String(url || '').trim()) ? String(url).trim() : '';
+    box.hidden = !url; qr.innerHTML = '';
+    if (!url) return;
+    $('#tZaloLink').href = url;
+    try {
+      const q = qrcode(0, 'M'); q.addData(url); q.make();
+      qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      $('#tZaloHint').hidden = false;
+    } catch (e) { $('#tZaloHint').hidden = true; }
+  }
 
-  $('#copyPhones').onclick = async () => {
-    const list = phones();
-    if (!list.length) { note('Không có SĐT nào theo bộ lọc này.'); return; }
-    const text = list.join(', ');
-    try { await navigator.clipboard.writeText(text); }
-    catch (e) {
-      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
-      ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove();
-    }
-    note('Đã sao chép ' + list.length + ' số điện thoại.');
+  $('#againBtn').onclick = () => {
+    form.reset(); syncRole(); say('');
+    $('#ticket').hidden = true; form.hidden = false;
+    loadSessions();
   };
 
-  $('#smsBtn').onclick = () => {
-    const list = phones();
-    if (!list.length) { note('Không có SĐT nào theo bộ lọc này.'); return; }
-    const s = sesById($('#fSes').value);
-    const def = '[' + (CFG.organizer || 'Ban tổ chức') + '] ' +
-      (s ? 'Suất ' + [s.gio, fmtDate(s.ngay)].filter(Boolean).join(' ') + ' (' + s.ten + '): ' : '');
-    const body = prompt('Nội dung tin nhắn gửi ' + list.length + ' số:', def);
-    if (body == null) return;
-    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    location.href = ios
-      ? 'sms:/open?addresses=' + list.join(',') + '&body=' + encodeURIComponent(body)
-      : 'sms:' + list.join(',') + '?body=' + encodeURIComponent(body);
-  };
-
-  if (API.remote && !key) showLogin(); else load(API.remote);
+  loadSessions();
 })();
 </script>
 </body>
