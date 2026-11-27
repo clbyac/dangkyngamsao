@@ -68,7 +68,7 @@
     return 'open';
   }
 
-  const ROLES = ['Học sinh', 'Phụ huynh', 'Thầy cô'];
+  const ROLES = ['Học sinh', 'Phụ huynh', 'Thầy cô', 'Du khách'];
   function cleanReg(d) {
     const s = v => String(v == null ? '' : v).trim().replace(/\s+/g, ' ');
     const out = {
@@ -78,9 +78,18 @@
       lop: s(d.lop).slice(0, 20),
       truong: s(d.truong).slice(0, 120),
       phuHuynh: s(d.phuHuynh).slice(0, 100),
+      tinh: s(d.tinh).slice(0, 60),
       sdt: normalizePhone(d.sdt)
     };
     if (!out.buoiId) throw new Error('Vui lòng chọn suất.');
+    if (out.vaiTro === 'Du khách') {
+      out.lop = out.truong = out.phuHuynh = '';
+      if (out.hoTen.length < 2) throw new Error('Vui lòng nhập họ và tên.');
+      if (out.tinh.length < 2) throw new Error('Vui lòng nhập tỉnh / thành phố.');
+      if (!PHONE_RE.test(out.sdt)) throw new Error('Số điện thoại chưa đúng (10 số, bắt đầu bằng 0).');
+      return out;
+    }
+    out.tinh = '';
     if (out.hoTen.length < 2) throw new Error('Vui lòng nhập họ và tên học sinh.');
     if (!out.lop) throw new Error('Vui lòng nhập lớp.');
     if (out.truong.length < 2) throw new Error('Vui lòng nhập trường.');
