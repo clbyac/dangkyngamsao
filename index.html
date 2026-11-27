@@ -31,6 +31,11 @@
 
     <section>
       <h2><span class="step">2</span> Thông tin của bạn</h2>
+      <div class="tabs" role="tablist" aria-label="Loại đăng ký">
+        <button type="button" role="tab" id="tabHS" aria-controls="paneHS" aria-selected="true">Học sinh</button>
+        <button type="button" role="tab" id="tabDK" aria-controls="paneDK" aria-selected="false">Du khách</button>
+      </div>
+      <div id="paneHS" role="tabpanel" aria-labelledby="tabHS">
       <div class="grid">
         <div class="field full"><span>Người đăng ký</span>
           <div class="seg" role="radiogroup" aria-label="Người đăng ký">
@@ -54,6 +59,21 @@
         <label class="field"><span>Số điện thoại <span class="req">*</span></span>
           <input name="sdt" type="tel" inputmode="tel" autocomplete="tel" placeholder="0912 345 678" maxlength="16">
         </label>
+      </div>
+      </div>
+      <div id="paneDK" role="tabpanel" aria-labelledby="tabDK" hidden>
+        <div class="grid">
+          <label class="field full"><span>Họ và tên <span class="req">*</span></span>
+            <input name="dkHoTen" autocomplete="name" maxlength="100">
+          </label>
+          <label class="field"><span>Tỉnh / Thành phố <span class="req">*</span></span>
+            <input name="dkTinh" list="dsTinh" maxlength="60" placeholder="VD: Đắk Lắk" autocomplete="off">
+          </label>
+          <label class="field"><span>Số điện thoại <span class="req">*</span></span>
+            <input name="dkSdt" type="tel" inputmode="tel" autocomplete="tel" placeholder="0912 345 678" maxlength="16">
+          </label>
+        </div>
+        <datalist id="dsTinh"><option value="An Giang"><option value="Bắc Ninh"><option value="Cà Mau"><option value="Cao Bằng"><option value="Cần Thơ"><option value="Đà Nẵng"><option value="Đắk Lắk"><option value="Điện Biên"><option value="Đồng Nai"><option value="Đồng Tháp"><option value="Gia Lai"><option value="Hà Nội"><option value="Hà Tĩnh"><option value="Hải Phòng"><option value="Hưng Yên"><option value="Huế"><option value="Khánh Hòa"><option value="Lai Châu"><option value="Lâm Đồng"><option value="Lạng Sơn"><option value="Lào Cai"><option value="Nghệ An"><option value="Ninh Bình"><option value="Phú Thọ"><option value="Quảng Ngãi"><option value="Quảng Ninh"><option value="Quảng Trị"><option value="Sơn La"><option value="Tây Ninh"><option value="Thái Nguyên"><option value="Thanh Hóa"><option value="TP. Hồ Chí Minh"><option value="Tuyên Quang"><option value="Vĩnh Long"><option value="Nước ngoài"></datalist>
       </div>
       <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
     </section>
@@ -154,7 +174,10 @@
   }
 
   box.addEventListener('change', () => { box.classList.remove('invalid'); say(''); });
-  form.addEventListener('input', e => { e.target.classList && e.target.classList.remove('invalid'); });
+  form.addEventListener('input', e => {
+    if (e.target.classList && e.target.classList.contains('invalid')) { e.target.classList.remove('invalid'); say(''); }
+  });
+
   function syncRole() {
     const ph = form.querySelector('input[name=vaiTro]:checked').value !== 'Học sinh';
     const el = form.elements.phuHuynh;
@@ -166,9 +189,32 @@
   form.querySelectorAll('input[name=vaiTro]').forEach(r => r.addEventListener('change', syncRole));
   syncRole();
 
+  let mode = /du-?khach/i.test(location.hash) ? 'dk' : 'hs';
+  function setMode(m) {
+    mode = m;
+    [['hs', 'tabHS', 'paneHS'], ['dk', 'tabDK', 'paneDK']].forEach(([k, tab, pane]) => {
+      const on = k === m;
+      $('#' + tab).setAttribute('aria-selected', on);
+      $('#' + pane).hidden = !on;
+      $('#' + pane).querySelectorAll('input, select, textarea').forEach(el => { el.disabled = !on; if (!on) el.classList.remove('invalid'); });
+    });
+    say('');
+  }
+  $('#tabHS').onclick = () => setMode('hs');
+  $('#tabDK').onclick = () => setMode('dk');
+  setMode(mode);
+
   function validate(d) {
     const t = v => String(v || '').trim();
     if (!d.buoiId) return [box, 'Vui lòng chọn suất.'];
+    if (d.vaiTro === 'Du khách') {
+      if (t(d.hoTen).length < 2) return [form.elements.dkHoTen, 'Vui lòng nhập họ và tên.'];
+      if (t(d.tinh).length < 2) return [form.elements.dkTinh, 'Vui lòng nhập tỉnh / thành phố.'];
+      if (!PHONE_RE.test(normalizePhone(d.sdt))) return [form.elements.dkSdt, 'Số điện thoại chưa đúng (10 số, bắt đầu bằng 0).'];
+      const s = sessions.find(x => x.id === d.buoiId);
+      if (s && s.conLai < 1) return [box, 'Suất này vừa hết chỗ — vui lòng chọn suất khác.'];
+      return null;
+    }
     if (t(d.hoTen).length < 2) return [form.elements.hoTen, 'Vui lòng nhập họ và tên học sinh.'];
     if (!t(d.lop)) return [form.elements.lop, 'Vui lòng nhập lớp.'];
     if (t(d.truong).length < 2) return [form.elements.truong, 'Vui lòng nhập trường.'];
@@ -181,8 +227,9 @@
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const d = Object.fromEntries(new FormData(form));
-    if (d.website) return;
+    let d = Object.fromEntries(new FormData(form));
+    if (mode === 'dk') d = { buoiId: d.buoiId, website: d.website, vaiTro: 'Du khách', hoTen: d.dkHoTen, tinh: d.dkTinh, sdt: d.dkSdt };
+    if (d.website) return; // bẫy bot
     const bad = validate(d);
     if (bad) {
       bad[0].classList.add('invalid');
@@ -207,14 +254,16 @@
     const s = res.session || sessions.find(x => x.id === d.buoiId) || {};
     const t = v => String(v || '').trim();
     $('#tCode').textContent = res.ma;
-    const rows = [
-      ['Học sinh', t(d.hoTen)],
-      ['Lớp – Trường', [t(d.lop), t(d.truong)].filter(Boolean).join(' – ')],
-      [d.vaiTro === 'Thầy cô' ? 'Thầy cô' : 'Phụ huynh', t(d.phuHuynh)],
+    const who = d.vaiTro === 'Du khách'
+      ? [['Họ tên', t(d.hoTen)], ['Tỉnh / TP', t(d.tinh)]]
+      : [['Học sinh', t(d.hoTen)],
+         ['Lớp – Trường', [t(d.lop), t(d.truong)].filter(Boolean).join(' – ')],
+         [d.vaiTro === 'Thầy cô' ? 'Thầy cô' : 'Phụ huynh', t(d.phuHuynh)]];
+    const rows = who.concat([
       ['Nội dung', s.ten],
       ['Thời gian', [s.gio, fmtDate(s.ngay, true)].filter(Boolean).join(' · ')],
       ['Địa điểm', s.diaDiem]
-    ].filter(r => r[1]);
+    ]).filter(r => r[1]);
     $('#tDetail').innerHTML = rows.map(r => '<div><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('');
     showZalo(s.zalo);
     form.hidden = true; $('#ticket').hidden = false;
@@ -235,7 +284,7 @@
   }
 
   $('#againBtn').onclick = () => {
-    form.reset(); syncRole(); say('');
+    form.reset(); syncRole(); setMode(mode); say('');
     $('#ticket').hidden = true; form.hidden = false;
     loadSessions();
   };
