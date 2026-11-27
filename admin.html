@@ -57,7 +57,12 @@
         <option value="no">Chưa đến</option>
         <option value="yes">Đã đến</option>
       </select>
-      <input id="fQ" type="search" placeholder="Tìm tên, lớp, trường, SĐT, mã…" aria-label="Tìm kiếm">
+      <select id="fType" aria-label="Lọc đối tượng" style="flex:0 1 170px">
+        <option value="">Mọi đối tượng</option>
+        <option value="hs">Học sinh / Trường</option>
+        <option value="dk">Du khách</option>
+      </select>
+      <input id="fQ" type="search" placeholder="Tìm tên, lớp, trường, tỉnh, SĐT, mã…" aria-label="Tìm kiếm">
     </div>
     <div class="toolbar">
       <button class="btn primary" id="xlsAll" type="button">⬇ Xuất Excel (tất cả suất)</button>
@@ -72,7 +77,7 @@
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>#</th><th>Mã</th><th>Học sinh</th><th>Phụ huynh, thầy cô / SĐT</th><th>Suất</th><th>Đăng ký lúc</th><th>Check-in</th>
+          <th>#</th><th>Mã</th><th>Người tham gia</th><th>Phụ huynh, thầy cô / SĐT</th><th>Suất</th><th>Đăng ký lúc</th><th>Check-in</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -149,7 +154,8 @@
 
   function fillSessionFilter() {
     const sel = $('#fSes'), cur = sel.value;
-    const upcoming = sortedSessions().find(s => !s.ngay || s.ngay >= todayStr());
+    // mặc định chọn buổi sắp tới gần nhất
+    const upcoming = sortedSessions().find(s => !s.ngay || s.ngay >= todayStr());  // suất hôm nay trở đi
     sel.innerHTML = '<option value="">Tất cả suất (' + data.rows.length + ' lượt)</option>' +
       sortedSessions().map(s => {
         const n = data.rows.filter(r => r.buoiId === s.id).length;
@@ -161,14 +167,16 @@
   }
 
   function filtered() {
-    const sid = $('#fSes').value, st = $('#fState').value;
+    const sid = $('#fSes').value, st = $('#fState').value, ty = $('#fType').value;
     const q = $('#fQ').value.trim().toLowerCase();
     return data.rows.filter(r => {
       if (sid && r.buoiId !== sid) return false;
+      if (ty === 'dk' && r.vaiTro !== 'Du khách') return false;
+      if (ty === 'hs' && r.vaiTro === 'Du khách') return false;
       if (st === 'yes' && !isTrue(r.checkin)) return false;
       if (st === 'no' && isTrue(r.checkin)) return false;
       if (q) {
-        const hay = [r.ma, r.hoTen, r.lop, r.truong, r.phuHuynh, r.sdt].join(' ').toLowerCase();
+        const hay = [r.ma, r.hoTen, r.lop, r.truong, r.phuHuynh, r.tinh, r.sdt].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -193,7 +201,8 @@
     if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Chưa có lượt đăng ký nào phù hợp.</td></tr>'; return; }
     tb.innerHTML = rows.map((r, i) => {
       const on = isTrue(r.checkin), ses = sesById(r.buoiId);
-      const lt = [r.lop, r.truong].filter(Boolean).join(' – ');
+      const lt = r.vaiTro === 'Du khách' ? ['Du khách', r.tinh].filter(Boolean).join(' · ')
+               : [r.lop, r.truong].filter(Boolean).join(' – ');
       const by = r.vaiTro === 'Phụ huynh' ? ' <span class="sub">(PH đăng ký)</span>'
                : r.vaiTro === 'Thầy cô' ? ' <span class="sub">(Thầy cô đăng ký)</span>' : '';
       return '<tr class="' + (on ? 'done' : '') + '">' +
@@ -212,6 +221,7 @@
 
   $('#fSes').onchange = render;
   $('#fState').onchange = render;
+  $('#fType').onchange = render;
   $('#fQ').oninput = render;
   $('#reloadBtn').onclick = () => load();
 
@@ -230,7 +240,7 @@
 
   /* ---------------- XUẤT EXCEL ---------------- */
   const COLS = [
-    ['hoTen', 'Họ và tên', 24], ['lop', 'Lớp', 7], ['truong', 'Trường', 24], ['phuHuynh', 'Phụ huynh / Thầy cô', 22],
+    ['hoTen', 'Họ và tên', 24], ['lop', 'Lớp', 7], ['truong', 'Trường', 24], ['phuHuynh', 'Phụ huynh / Thầy cô', 22], ['tinh', 'Tỉnh', 14],
     ['sdt', 'Số điện thoại', 13], ['vaiTro', 'Người đăng ký', 12], ['ngay', 'Ngày', 11], ['gio', 'Giờ', 7],
     ['tenBuoi', 'Nội dung', 34], ['ma', 'Mã ĐK', 10], ['thoiGian', 'Thời gian ĐK', 19],
     ['checkin', 'Đã đến', 8], ['gioCheckin', 'Giờ check-in', 19]
@@ -251,14 +261,15 @@
     return ws;
   }
   function summarySheet(list) {
-    const head = ['Mã suất', 'Ngày', 'Giờ', 'Nội dung', 'Địa điểm', 'Sức chứa', 'Đã đăng ký', 'Đã đến', 'Còn trống'];
+    const head = ['Mã suất', 'Ngày', 'Giờ', 'Nội dung', 'Địa điểm', 'Sức chứa', 'Đã đăng ký', 'Học sinh / Trường', 'Du khách', 'Đã đến', 'Còn trống'];
     const body = list.map(s => {
       const rs = data.rows.filter(r => r.buoiId === s.id);
+      const dk = rs.filter(r => r.vaiTro === 'Du khách').length;
       const inn = rs.filter(r => isTrue(r.checkin)).length;
-      return [s.id, fmtDate(s.ngay), s.gio || '', s.ten, s.diaDiem || '', +s.sucChua || 0, rs.length, inn, Math.max(0, (+s.sucChua || 0) - rs.length)];
+      return [s.id, fmtDate(s.ngay), s.gio || '', s.ten, s.diaDiem || '', +s.sucChua || 0, rs.length, rs.length - dk, dk, inn, Math.max(0, (+s.sucChua || 0) - rs.length)];
     });
     const ws = XLSX.utils.aoa_to_sheet([head].concat(body));
-    ws['!cols'] = [8, 11, 7, 38, 28, 9, 11, 8, 10].map(w => ({ wch: w }));
+    ws['!cols'] = [8, 11, 7, 38, 28, 9, 11, 16, 9, 8, 10].map(w => ({ wch: w }));
     return ws;
   }
   function sheetName(s, used) {
